@@ -22,7 +22,7 @@ type HttpError string
 type HttpSuccessCallback func(string)
 type HttpFailureCallback func(error)
 type HttpParams map[string]interface{}
-type HttpRes func()(*http.Response, error)
+type HttpRes func(string)(*http.Response, error)
 
 type fastHttp struct {
 	Addr   string
@@ -30,8 +30,6 @@ type fastHttp struct {
 	Url    *url.URL
 	Params HttpParams
 }
-
-var instance fastHttp
 
 func (ctx HttpError) Error() string {
 	return fmt.Sprintf("Http Error: %s", string(ctx))
@@ -77,13 +75,13 @@ func (ctx *fastHttp) Send(dataCh chan string, errorCh chan error){
 		}
 		ctx.Url.RawQuery = oQuery.Encode()
 		ctx.Addr = ctx.Url.String()
-		go serviceRequest(dataCh, errorCh, func() (*http.Response, error) {
-			return http.Get(ctx.Addr)
+		go serviceRequest(ctx.Addr,dataCh, errorCh, func(addr string) (*http.Response, error) {
+			return http.Get(addr)
 		})
 	case POST:
 		body := ctx.ParseHttpParams(ctx.Params)
-		go serviceRequest(dataCh, errorCh, func() (*http.Response, error) {
-			return http.Post(ctx.Addr, "application/x-www-form-urlencoded", strings.NewReader(body))
+		go serviceRequest(ctx.Addr,dataCh, errorCh, func(addr string) (*http.Response, error) {
+			return http.Post(addr, "application/x-www-form-urlencoded", strings.NewReader(body))
 		})
 	case JSON:
 		encode, err := json.Marshal(ctx.Params)
@@ -91,8 +89,8 @@ func (ctx *fastHttp) Send(dataCh chan string, errorCh chan error){
 			errorCh <- err
 			return
 		}
-		go serviceRequest(dataCh, errorCh, func() (*http.Response, error) {
-			return http.Post(ctx.Addr, "application/json", strings.NewReader(string(encode)))
+		go serviceRequest(ctx.Addr,dataCh, errorCh, func(addr string) (*http.Response, error) {
+			return http.Post(addr, "application/json", strings.NewReader(string(encode)))
 		})
 	}
 }
@@ -105,12 +103,8 @@ func (ctx *fastHttp) ParseHttpParams(body HttpParams) string {
 	return oQuery.Encode()
 }
 
-func init() {
-	instance = fastHttp{}
-}
-
-func serviceRequest(dataCh chan string, errCh chan error, callback HttpRes){
-	resp, err := callback()
+func serviceRequest(addr string, dataCh chan string, errCh chan error, callback HttpRes){
+	resp, err := callback(addr)
 	defer resp.Body.Close()
 	if err != nil{
 		errCh <- err
