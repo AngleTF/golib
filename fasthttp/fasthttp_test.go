@@ -10,21 +10,26 @@ func TestGet(t *testing.T) {
 	var dataChannel = make(chan string, 10)
 	var errorChannel = make(chan error, 10)
 	//使用get请求数据
-	Get("http://121", dataChannel, errorChannel).
-		SetParams(url.Values{"name[]":[]string{"tao","li"}}).
+	Get("http://127.0.0.1:8080/test.php", dataChannel, errorChannel).
+		SetParams(url.Values{"name[]":[]string{"tao","11111"}}).
+		PushQueue()
+
+	Get("http://127.0.0.1:8080/test.php", dataChannel, errorChannel).
+		SetParams(url.Values{"name[]":[]string{"tao","22222"}}).
 		PushQueue()
 
 	Run()
-	for {
+
+	for  {
 		select {
 		case data := <-dataChannel:
 			fmt.Println(data)
 		case err := <-errorChannel:
 			fmt.Println(err)
-		default:
-			fmt.Println("default")
+
 		}
 	}
+
 }
 
 func TestPost(t *testing.T) {
@@ -37,14 +42,14 @@ func TestPost(t *testing.T) {
 		PushQueue()
 
 	Run()
-	for {
-		select {
-		case data := <-dataChannel:
-			fmt.Println(data)
-		case err := <-errorChannel:
-			fmt.Println(err)
-		}
-	}
+	//for {
+	//	select {
+	//	case data := <-dataChannel:
+	//		fmt.Println(data)
+	//	case err := <-errorChannel:
+	//		fmt.Println(err)
+	//	}
+	//}
 }
 
 func TestJson(t *testing.T) {
