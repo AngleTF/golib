@@ -1,6 +1,9 @@
 package fastslice
 
-import "reflect"
+import (
+	"reflect"
+
+)
 
 func Pop(v interface{}) (reflect.Value, bool) {
 	var vof, lastSlice reflect.Value
@@ -21,3 +24,29 @@ func Pop(v interface{}) (reflect.Value, bool) {
 	vof.Set(vof.Slice(0, vof.Len() - 1))
 	return lastSlice.Index(0), true
 }
+
+func Push(v interface{}, d interface{}) bool{
+	var vi, nvi, di reflect.Value
+	vi = reflect.ValueOf(v)
+	di = reflect.ValueOf(d)
+
+	if vi.Kind() != reflect.Ptr{
+		return false
+	}
+
+	vi = vi.Elem()
+	if !vi.CanSet() || vi.Kind() != reflect.Slice{
+		return false
+	}
+
+
+	//if vi.Index(0).Type().String() != di.Type().String(){
+	//	return false
+	//}
+
+	nvi = reflect.Append(vi, di)
+
+	vi.Set(nvi)
+	return true
+}
+

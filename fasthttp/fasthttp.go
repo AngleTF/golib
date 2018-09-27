@@ -10,6 +10,7 @@ import (
 	"time"
 	"golib/fastcheck"
 	"golib/fastslice"
+	//"crypto/tls"
 )
 
 //FastHttp method list
@@ -72,7 +73,7 @@ func NewSetting(method string, addr string, methodType int8, headers HttpHeader,
 		Method:       method,
 		MethodType:   methodType,
 		Redirect:     true,
-		UserAgent:    "FastHttp/1.0",
+		UserAgent:    "FastHttp/v1.1",
 		Header:       headers,
 		DataChannel:  dc,
 		ErrorChannel: ec,
@@ -214,14 +215,15 @@ func serviceRequest(fastHttp *FastHttp, callback HttpRes) {
 	defer resp.Body.Close()
 
 	body, err = ioutil.ReadAll(resp.Body)
+
 	if err != nil {
 		panic(HttpError(err.Error()))
 	}
 
-	err = stateAudit(resp.StatusCode, resp.Status)
-	if err != nil {
-		panic(err)
-	}
+	//err = stateAudit(resp.StatusCode, resp.Status)
+	//if err != nil {
+	//	panic(err)
+	//}
 
 	fastHttp.Response = resp
 
@@ -239,8 +241,33 @@ func stateAudit(code int, message string) error {
 	}
 }
 
-func Run() {
-	client := &http.Client{}
+type ClientSetting struct{
+	Timeout time.Duration
+}
+
+func NewClient() *ClientSetting{
+	return &ClientSetting{
+		Timeout:time.Second,
+	}
+}
+
+func (ctx *ClientSetting) SetTimeout(t time.Duration) *ClientSetting{
+	ctx.Timeout = t
+	return ctx
+}
+
+
+func (ctx *ClientSetting) Run() {
+
+	client := &http.Client{
+		Timeout:ctx.Timeout,
+		//Transport: &http.Transport{
+		//	TLSClientConfig: &tls.Config{
+		//		RootCAs: pool,
+		//		},
+		//	DisableCompression: true,
+		//},
+	}
 
 	for lastRequestVal, flag := fastslice.Pop(&requestQueue); flag; {
 
@@ -248,7 +275,7 @@ func Run() {
 		if !ok{
 			continue
 		}
-
+		fmt.Println(lastRequest.Setting.Addr)
 		go serviceRequest(lastRequest, func(request *http.Request) (*http.Response, error) {
 			return client.Do(request)
 		})

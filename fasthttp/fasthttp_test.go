@@ -4,6 +4,7 @@ import (
 	"testing"
 	"fmt"
 	"net/url"
+	"time"
 )
 
 func TestGet(t *testing.T) {
@@ -18,7 +19,7 @@ func TestGet(t *testing.T) {
 		SetParams(url.Values{"name[]":[]string{"tao","22222"}}).
 		PushQueue()
 
-	Run()
+	NewClient().SetTimeout(time.Second).Run()
 
 	for  {
 		select {
@@ -41,7 +42,7 @@ func TestPost(t *testing.T) {
 		SetParams(url.Values{"name[]":[]string{"tao"}}).
 		PushQueue()
 
-	Run()
+	NewClient().SetTimeout(time.Nanosecond).Run()
 	//for {
 	//	select {
 	//	case data := <-dataChannel:
@@ -61,7 +62,7 @@ func TestJson(t *testing.T) {
 		SetParams(map[string]string{"name":"tao"}).
 		PushQueue()
 
-	Run()
+	NewClient().SetTimeout(time.Nanosecond).Run()
 
 	for {
 		select {
