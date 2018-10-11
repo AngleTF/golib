@@ -1,11 +1,12 @@
-package fastcheck
+package fastCheck
 
 import (
 	"reflect"
+	"fmt"
 )
 
 func IsZero(v interface{}) bool {
-	return v == 0 || v == "0"
+	return fmt.Sprint(v) == "0"
 }
 
 func IsEmpty(v string) bool {

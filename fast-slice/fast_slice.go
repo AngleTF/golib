@@ -1,4 +1,4 @@
-package fastslice
+package fastSlice
 
 import (
 	"reflect"
@@ -25,28 +25,22 @@ func Pop(v interface{}) (reflect.Value, bool) {
 	return lastSlice.Index(0), true
 }
 
-func Push(v interface{}, d interface{}) bool{
+func Push(v interface{}, d interface{}){
 	var vi, nvi, di reflect.Value
 	vi = reflect.ValueOf(v)
 	di = reflect.ValueOf(d)
 
 	if vi.Kind() != reflect.Ptr{
-		return false
+		return
 	}
 
 	vi = vi.Elem()
 	if !vi.CanSet() || vi.Kind() != reflect.Slice{
-		return false
+		return
 	}
-
-
-	//if vi.Index(0).Type().String() != di.Type().String(){
-	//	return false
-	//}
 
 	nvi = reflect.Append(vi, di)
 
 	vi.Set(nvi)
-	return true
 }
 

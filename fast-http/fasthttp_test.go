@@ -1,4 +1,4 @@
-package fasthttp
+package fastHttp
 
 import (
 	"testing"
@@ -11,15 +11,15 @@ func TestGet(t *testing.T) {
 	var dataChannel = make(chan string, 10)
 	var errorChannel = make(chan error, 10)
 	//使用get请求数据
-	Get("http://127.0.0.1:8080/test.php", dataChannel, errorChannel).
-		SetParams(url.Values{"name[]":[]string{"tao","11111"}}).
+	Get("https://www.qu.la/BookFiles/BookImages/shenyidinv.jpg", dataChannel, errorChannel).
+		//SetParams(url.Values{"name[]":[]string{"tao","11111"}}).
 		PushQueue()
 
-	Get("http://127.0.0.1:8080/test.php", dataChannel, errorChannel).
-		SetParams(url.Values{"name[]":[]string{"tao","22222"}}).
-		PushQueue()
+	//Get("http://127.0.0.1:8080/test.php", dataChannel, errorChannel).
+	//	SetParams(url.Values{"name[]":[]string{"tao","22222"}}).
+	//	PushQueue()
 
-	NewClient().SetTimeout(time.Second).Run()
+	NewClient().SetTimeout(time.Second * 100).Run()
 
 	for  {
 		select {
@@ -27,7 +27,6 @@ func TestGet(t *testing.T) {
 			fmt.Println(data)
 		case err := <-errorChannel:
 			fmt.Println(err)
-
 		}
 	}
 

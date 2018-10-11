@@ -1,11 +1,11 @@
-package fastslice
+package fastSlice
 
 import (
 	"testing"
 	"fmt"
 )
 
-var nameList = []interface{}{1,1,1,1}
+var nameList = []int{}
 
 func TestPop(t *testing.T) {
 	lastName, eof := Pop(&nameList)
@@ -17,6 +17,6 @@ func TestPop(t *testing.T) {
 }
 
 func TestPush(t *testing.T) {
-	flag := Push(&nameList, "11")
-	fmt.Println(nameList, flag)
+	Push(&nameList, 111)
+	fmt.Println(nameList)
 }

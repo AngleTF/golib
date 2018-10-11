@@ -1,4 +1,4 @@
-package fasthttp
+package fastHttp
 
 import (
 	"net/http"
@@ -8,9 +8,9 @@ import (
 	"strings"
 	"encoding/json"
 	"time"
-	"golib/fastcheck"
-	"golib/fastslice"
-	//"crypto/tls"
+	"golib/fast-slice"
+	"golib/fast-check"
+	"crypto/tls"
 )
 
 //FastHttp method list
@@ -120,10 +120,21 @@ func (ctx *Setting) SetCookie(name string, value string, path string, tm time.Ti
 		Path:    path,
 		Expires: tm,
 	}
-	if !fastcheck.IsEmpty(ctx.Cookie) {
+	if !fastCheck.IsEmpty(ctx.Cookie) {
 		ctx.Cookie += "; "
 	}
 	ctx.Cookie += cookie.String()
+	return ctx
+}
+
+func (ctx *Setting) SetSourceCookie(c []*http.Cookie) *Setting {
+	for _, v := range c {
+		if !fastCheck.IsEmpty(ctx.Cookie) {
+			ctx.Cookie += "; "
+		}
+		ctx.Cookie += v.String()
+	}
+	fmt.Println(ctx.Cookie)
 	return ctx
 }
 
@@ -168,11 +179,11 @@ func NewFastHttp(setting *Setting) *FastHttp {
 		panic(HttpError(err.Error()))
 	}
 
-	if setting.UserAgent != "" {
+	if !fastCheck.IsEmpty(setting.UserAgent) {
 		req.Header.Set("User-Agent", setting.UserAgent)
 	}
 
-	if setting.Cookie != "" {
+	if !fastCheck.IsEmpty(setting.Cookie) {
 		req.Header.Set("Cookie", setting.Cookie)
 	}
 
@@ -241,38 +252,37 @@ func stateAudit(code int, message string) error {
 	}
 }
 
-type ClientSetting struct{
+type ClientSetting struct {
 	Timeout time.Duration
 }
 
-func NewClient() *ClientSetting{
+func NewClient() *ClientSetting {
 	return &ClientSetting{
-		Timeout:time.Second,
+		Timeout: time.Second,
 	}
 }
 
-func (ctx *ClientSetting) SetTimeout(t time.Duration) *ClientSetting{
+func (ctx *ClientSetting) SetTimeout(t time.Duration) *ClientSetting {
 	ctx.Timeout = t
 	return ctx
 }
 
-
 func (ctx *ClientSetting) Run() {
 
 	client := &http.Client{
-		Timeout:ctx.Timeout,
-		//Transport: &http.Transport{
-		//	TLSClientConfig: &tls.Config{
-		//		RootCAs: pool,
-		//		},
-		//	DisableCompression: true,
-		//},
+		Timeout: ctx.Timeout,
+		Transport: &http.Transport{
+			TLSClientConfig: &tls.Config{
+				InsecureSkipVerify: true,
+				},
+			DisableCompression: false,
+		},
 	}
 
-	for lastRequestVal, flag := fastslice.Pop(&requestQueue); flag; {
+	for lastRequestVal, flag := fastSlice.Pop(&requestQueue); flag; {
 
 		lastRequest, ok := lastRequestVal.Interface().(*FastHttp)
-		if !ok{
+		if !ok {
 			continue
 		}
 		fmt.Println(lastRequest.Setting.Addr)
@@ -280,7 +290,6 @@ func (ctx *ClientSetting) Run() {
 			return client.Do(request)
 		})
 
-		lastRequestVal, flag = fastslice.Pop(&requestQueue)
+		lastRequestVal, flag = fastSlice.Pop(&requestQueue)
 	}
 }
-
