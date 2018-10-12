@@ -134,7 +134,6 @@ func (ctx *Setting) SetSourceCookie(c []*http.Cookie) *Setting {
 		}
 		ctx.Cookie += v.String()
 	}
-	fmt.Println(ctx.Cookie)
 	return ctx
 }
 
@@ -285,7 +284,7 @@ func (ctx *ClientSetting) Run() {
 		if !ok {
 			continue
 		}
-		fmt.Println(lastRequest.Setting.Addr)
+
 		go serviceRequest(lastRequest, func(request *http.Request) (*http.Response, error) {
 			return client.Do(request)
 		})
