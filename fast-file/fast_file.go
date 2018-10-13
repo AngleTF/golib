@@ -38,8 +38,11 @@ func (ctx *Setting) PushFileData(fileName, data string) error {
 func NewDir(rootDir string, flag int, fileMode os.FileMode) (*Setting, error) {
 	if _, err := os.Stat(rootDir); err != nil {
 		if os.IsNotExist(err) {
-			if err := os.MkdirAll(rootDir, os.ModeDir); err != nil {
+			if err := os.MkdirAll(rootDir, os.ModePerm); err != nil {
 				return nil, fmt.Errorf("create directory failure, path : %s", rootDir)
+			}
+			if err := os.Chmod(rootDir, os.ModePerm); err != nil{
+				return nil, fmt.Errorf("chmod directory failure, path : %s", rootDir)
 			}
 		} else if os.IsPermission(err) {
 			return nil, fmt.Errorf("permission denied, path : %s", rootDir)
