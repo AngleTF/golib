@@ -51,6 +51,7 @@ func NewLog(logDir string) (*Log ,error){
 func (l *Log) Error(format string, val ...interface{}){
 	l.PushData(ERROR, format, val...)
 }
+
 func (l *Log) Info(format string, val ...interface{}){
 	l.PushData(INFO, format, val...)
 }

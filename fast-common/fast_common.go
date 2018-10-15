@@ -183,31 +183,67 @@ func compress(dirName, deposit string, zWriter *zip.Writer, prefix string) error
 	return nil
 }
 
-func Zip(dirName, deposit string) error {
+func StrToZip(fileName, data, deposit string) error{
+	var (
+		err     	error
+		zipWriter 	*zip.Writer
+		w			io.Writer
+		r			io.Reader
+	)
+
+	if zipWriter, err = getZipWrite(deposit); err != nil{
+		return err
+	}
+
+	if w, err = zipWriter.Create(fileName); err != nil{
+		return err
+	}
+
+	r = bytes.NewReader([]byte(data))
+
+	if _, err = io.Copy(w, r); err != nil{
+		return err
+	}
+
+	defer zipWriter.Close()
+	return nil
+}
+
+func getZipWrite(deposit string) (*zip.Writer, error){
 	var (
 		file    *os.File
 		err     error
-		zWriter *zip.Writer
 		baseDir string
 	)
 
 	baseDir = deposit[:strings.LastIndex(deposit, "/")]
 
 	if err = os.MkdirAll(baseDir, os.ModePerm); err != nil {
-		return err
+		return nil, err
 	}
 
 	if file, err = os.OpenFile(deposit, os.O_CREATE|os.O_WRONLY, os.ModePerm); err != nil {
+		return nil, err
+	}
+
+	return zip.NewWriter(file), nil
+}
+
+func Zip(dirName, deposit string) error {
+	var (
+		err     error
+		zipWriter *zip.Writer
+	)
+
+	if zipWriter, err = getZipWrite(deposit); err != nil{
 		return err
 	}
-	defer file.Close()
 
-	zWriter = zip.NewWriter(file)
-
-	if err = compress(dirName, deposit, zWriter, ""); err != nil {
+	if err = compress(dirName, deposit, zipWriter, ""); err != nil {
 		return err
 	}
-	zWriter.Close()
+
+	defer zipWriter.Close()
 	return nil
 }
 

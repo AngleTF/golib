@@ -7,7 +7,7 @@ import (
 var err error
 
 func TestZip(t *testing.T) {
-	if err = Zip("D:/data/zip/1", "D:/data/zip/2/2.zip"); err != nil {
+	if err = Zip("D:/data/book/0/1", "D:/data/zip/2/2.zip"); err != nil {
 		fmt.Println(err)
 	}
 }
@@ -28,4 +28,10 @@ func TestEncrypt(t *testing.T) {
 
 func TestJoinUrl(t *testing.T) {
 	fmt.Println(JoinUrl("hello/", "/word"))
+}
+
+func TestStrToZip(t *testing.T){
+	if err := StrToZip("f.txt", "123", "D:/data/zip/2/3.zip"); err != nil{
+		fmt.Println(err)
+	}
 }
