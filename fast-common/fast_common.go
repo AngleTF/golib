@@ -10,66 +10,71 @@ import (
 	"golang.org/x/text/encoding/simplifiedchinese"
 	"io/ioutil"
 	"golib/fast-check"
+	"reflect"
+	"fmt"
+	"time"
+	"strconv"
+	"crypto/md5"
 )
 
-func JoinUrl (u1, u2 string) string {
+func JoinUrl(u1, u2 string) string {
 	return strings.TrimRight(u1, "/") + "/" + strings.TrimLeft(u2, "/")
 }
 
-func TrimSpaces(args ...*string){
-	for _, v := range args{
+func TrimSpaces(args ...*string) {
+	for _, v := range args {
 		*v = strings.TrimSpace(*v)
 	}
 }
 
-func Encrypt(sb []byte, slat string) string{
+func Encrypt(sb []byte, slat string) string {
 	var (
-		c byte
-		i uint
-		size uint
-		slatsb []byte
+		c        byte
+		i        uint
+		size     uint
+		slatsb   []byte
 		slatsize uint
 	)
 
 	size = uint(len(sb))
 	slatsb, slatsize = GetByteAndSize(slat)
 
-	if sb == nil || size <= 0{
+	if sb == nil || size <= 0 {
 		return string(sb)
 	}
 
-	for i = 0; i < size; i++{
-		c = (sb[i] << (i%8)) + (sb[i] >> (8-i%8))
-		sb[i] = c^slatsb[i%slatsize]
+	for i = 0; i < size; i++ {
+		c = (sb[i] << (i % 8)) + (sb[i] >> (8 - i%8))
+		sb[i] = c ^ slatsb[i%slatsize]
 	}
 
 	return string(sb)
 }
 
-func Decrypt(s, slat string) string{
+func Decrypt(s, slat string) string {
 	var (
-		c byte
-		i uint
-		sb []byte
-		size uint
-		slatsb []byte
+		c        byte
+		i        uint
+		sb       []byte
+		size     uint
+		slatsb   []byte
 		slatsize uint
 	)
 	sb, size = GetByteAndSize(s)
 	slatsb, slatsize = GetByteAndSize(slat)
 
-	if sb == nil || size <= 0{
+	if sb == nil || size <= 0 {
 		return s
 	}
 
-	for i = 0; i < size; i++{
-		c = sb[i]^slatsb[i%slatsize]
-		sb[i] = (c >> (i%8)) + c << (8 - i%8)
+	for i = 0; i < size; i++ {
+		c = sb[i] ^ slatsb[i%slatsize]
+		sb[i] = (c >> (i % 8)) + c<<(8-i%8)
 	}
 	return string(sb)
 }
 
-func GetByteAndSize(s string) ([]byte, uint){
+func GetByteAndSize(s string) ([]byte, uint) {
 	var sb = []byte(s)
 	var size = uint(len(sb))
 	return sb, size
@@ -175,7 +180,6 @@ func compress(dirName, deposit string, zWriter *zip.Writer, prefix string) error
 		fr.Close()
 	}
 
-
 	return nil
 }
 
@@ -189,7 +193,7 @@ func Zip(dirName, deposit string) error {
 
 	baseDir = deposit[:strings.LastIndex(deposit, "/")]
 
-	if err = os.MkdirAll(baseDir, os.ModePerm); err != nil{
+	if err = os.MkdirAll(baseDir, os.ModePerm); err != nil {
 		return err
 	}
 
@@ -205,4 +209,70 @@ func Zip(dirName, deposit string) error {
 	}
 	zWriter.Close()
 	return nil
+}
+
+func Instance2join(structure interface{}, split string, filter []string) string {
+
+	refVal := reflect.ValueOf(structure)
+	refTyp := reflect.TypeOf(structure)
+
+	var str []string
+	flag := true
+
+	for i := 0; i < refVal.NumField(); i++ {
+		val := fmt.Sprint(refVal.Field(i))
+		for _, v := range filter {
+			if v == refTyp.Field(i).Name {
+				flag = false
+			}
+		}
+		if flag {
+			str = append(str, val)
+		} else {
+			flag = true
+		}
+	}
+
+	joinStr := strings.Join(str, split)
+
+	return joinStr
+}
+
+const (
+	Y = "2006"
+	m = "01"
+	d = "02"
+	H = "15"
+	i = "04"
+	s = "05"
+)
+
+var template = map[string]string{"Y": Y, "m": m, "d": d, "H": H, "i": i, "s": s}
+
+func Date(mode string, t interface{}) string {
+
+	for k, v := range template {
+		mode = strings.Replace(mode, k, v, -1)
+	}
+
+	switch t.(type) {
+	case time.Time:
+		return t.(time.Time).Format(mode)
+	case int:
+		unix := time.Unix(int64(t.(int)), 0)
+		return unix.Format(mode)
+	default:
+		return strconv.FormatInt(time.Now().Unix(), 10)
+	}
+
+}
+
+
+func Md5(str string , lower bool) string {
+	md5Bytes := md5.Sum([]byte(str))
+	if lower {
+		return fmt.Sprintf("%x", md5Bytes)
+	}else{
+		return fmt.Sprintf("%X", md5Bytes)
+	}
 }
