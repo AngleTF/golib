@@ -128,6 +128,9 @@ func (ctx *Setting) SetCookie(name string, value string, path string, tm time.Ti
 }
 
 func (ctx *Setting) SetSourceCookie(c []*http.Cookie) *Setting {
+	if c == nil{
+		return ctx
+	}
 	for _, v := range c {
 		if !fastCheck.IsEmpty(ctx.Cookie) {
 			ctx.Cookie += "; "
@@ -205,11 +208,14 @@ func ParseHttpParams(body url.Values) string {
 	return body.Encode()
 }
 
-func serviceRequest(fastHttp *FastHttp, callback HttpRes) {
+func serviceRequest(fastHttp *FastHttp, callback HttpRes, quelen int, done chan bool) {
 	var resp *http.Response
 	var body []byte
 
 	defer func() {
+		if quelen == 0{
+			done <- true
+		}
 		if err := recover(); err != nil {
 			fastHttp.Setting.ErrorChannel <- err.(HttpError)
 			return
@@ -266,7 +272,12 @@ func (ctx *ClientSetting) SetTimeout(t time.Duration) *ClientSetting {
 	return ctx
 }
 
-func (ctx *ClientSetting) Run() {
+
+
+func (ctx *ClientSetting) Run() chan bool {
+
+	var done = make(chan bool, 1)
+	var queueLen = len(requestQueue)
 
 	client := &http.Client{
 		Timeout: ctx.Timeout,
@@ -279,6 +290,7 @@ func (ctx *ClientSetting) Run() {
 	}
 
 	for lastRequestVal, flag := fastSlice.Pop(&requestQueue); flag; {
+		queueLen -= 1
 
 		lastRequest, ok := lastRequestVal.Interface().(*FastHttp)
 		if !ok {
@@ -287,8 +299,10 @@ func (ctx *ClientSetting) Run() {
 
 		go serviceRequest(lastRequest, func(request *http.Request) (*http.Response, error) {
 			return client.Do(request)
-		})
+		},queueLen, done)
 
 		lastRequestVal, flag = fastSlice.Pop(&requestQueue)
 	}
+
+	return done
 }
