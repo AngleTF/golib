@@ -177,6 +177,8 @@ func NewFastHttp(setting *Setting) *FastHttp {
 	}
 
 	req, err = http.NewRequest(setting.Method, setting.Addr, strings.NewReader(body))
+	req.Close = true
+
 	if err != nil {
 		panic(HttpError(err.Error()))
 	}
@@ -208,27 +210,31 @@ func ParseHttpParams(body url.Values) string {
 	return body.Encode()
 }
 
-func serviceRequest(fastHttp *FastHttp, callback HttpRes, quelen int, done chan bool) {
+func serviceRequest(fastHttp *FastHttp, callback HttpRes, done chan bool, queLen *int) {
 	var resp *http.Response
 	var body []byte
 
 	defer func() {
-		if quelen == 0{
-			done <- true
-		}
+		*queLen -= 1
 		if err := recover(); err != nil {
 			fastHttp.Setting.ErrorChannel <- err.(HttpError)
-			return
+		}
+		if *queLen <= 0{
+			done <- true
 		}
 	}()
 
 	resp, err = callback(fastHttp.Request)
 
+
+
 	if err != nil {
 		panic(HttpError(err.Error()))
 	}
 
-	defer resp.Body.Close()
+	defer func() {
+		resp.Body.Close()
+	}()
 
 	body, err = ioutil.ReadAll(resp.Body)
 
@@ -242,6 +248,8 @@ func serviceRequest(fastHttp *FastHttp, callback HttpRes, quelen int, done chan 
 	//}
 
 	fastHttp.Response = resp
+
+
 
 	fastHttp.Setting.DataChannel <- string(body)
 }
@@ -272,7 +280,7 @@ func (ctx *ClientSetting) SetTimeout(t time.Duration) *ClientSetting {
 	return ctx
 }
 
-
+//var queueLen int
 
 func (ctx *ClientSetting) Run() chan bool {
 
@@ -290,7 +298,7 @@ func (ctx *ClientSetting) Run() chan bool {
 	}
 
 	for lastRequestVal, flag := fastSlice.Pop(&requestQueue); flag; {
-		queueLen -= 1
+
 
 		lastRequest, ok := lastRequestVal.Interface().(*FastHttp)
 		if !ok {
@@ -299,7 +307,7 @@ func (ctx *ClientSetting) Run() chan bool {
 
 		go serviceRequest(lastRequest, func(request *http.Request) (*http.Response, error) {
 			return client.Do(request)
-		},queueLen, done)
+		}, done, &queueLen)
 
 		lastRequestVal, flag = fastSlice.Pop(&requestQueue)
 	}
