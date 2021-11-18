@@ -1,18 +1,17 @@
 package fastHttp
 
 import (
+	"encoding/json"
+	"fmt"
+	"golib/fast-check"
+	"golib/fast-slice"
+	"io/ioutil"
 	"net/http"
 	"net/url"
-	"fmt"
-	"io/ioutil"
 	"strings"
-	"encoding/json"
 	"time"
-	"golib/fast-slice"
-	"golib/fast-check"
-	"crypto/tls"
+	//"crypto/tls"
 	"encoding/base64"
-
 )
 
 //FastHttp method list
@@ -57,15 +56,15 @@ type FastHttp struct {
 	Setting  *Setting
 }
 
-func Get(addr string, dc chan string, ec chan error) (*Setting) {
+func Get(addr string, dc chan string, ec chan error) *Setting {
 	return NewSetting("GET", addr, GET, HttpHeader{"Content-Type": "text/plain"}, dc, ec)
 }
 
-func Post(addr string, dc chan string, ec chan error) (*Setting) {
+func Post(addr string, dc chan string, ec chan error) *Setting {
 	return NewSetting("POST", addr, POST, HttpHeader{"Content-Type": "application/x-www-form-urlencoded"}, dc, ec)
 }
 
-func Json(addr string, dc chan string, ec chan error) (*Setting) {
+func Json(addr string, dc chan string, ec chan error) *Setting {
 	return NewSetting("POST", addr, JSON, HttpHeader{"Content-Type": "application/json"}, dc, ec)
 }
 
@@ -132,7 +131,7 @@ func (ctx *Setting) SetCookie(name string, value string, path string, tm time.Ti
 }
 
 func (ctx *Setting) SetSourceCookie(c []*http.Cookie) *Setting {
-	if c == nil{
+	if c == nil {
 		return ctx
 	}
 	for _, v := range c {
@@ -144,8 +143,8 @@ func (ctx *Setting) SetSourceCookie(c []*http.Cookie) *Setting {
 	return ctx
 }
 
-func (ctx *Setting) SetProxyAuthorization(username, password string) *Setting{
-	ctx.Header["Proxy-Authorization"] = "Basic " + base64.StdEncoding.EncodeToString([]byte(username + ":" + password))
+func (ctx *Setting) SetProxyAuthorization(username, password string) *Setting {
+	ctx.Header["Proxy-Authorization"] = "Basic " + base64.StdEncoding.EncodeToString([]byte(username+":"+password))
 	return ctx
 }
 
@@ -156,30 +155,30 @@ func (ctx *Setting) PushQueue() {
 
 func NewFastHttp(setting *Setting) *FastHttp {
 	var (
-		req *http.Request
+		req  *http.Request
 		body string
 	)
 
-	switch setting.MethodType {
-	case GET:
-	case POST:
-		if gps, ok := setting.Params.(url.Values); ok {
-			body = ParseHttpParams(gps)
-		} else {
-			panic(HttpError("post params value type is url.Value"))
+	if setting.Params != nil {
+		switch setting.MethodType {
+		case GET:
+		case POST:
+			if gps, ok := setting.Params.(url.Values); ok {
+				body = ParseHttpParams(gps)
+			} else {
+				panic(err.Error())
+			}
+		case JSON:
+			var params []byte
+			params, err = json.Marshal(setting.Params)
+			if err != nil {
+				panic(err)
+			}
+			body = string(params)
 		}
-	case JSON:
-		var params []byte
-		params, err = json.Marshal(setting.Params)
-		if err != nil {
-			panic(err)
-		}
-		body = string(params)
-	default:
-		panic(HttpError("please select http request method"))
 	}
 
-	if req, err = http.NewRequest(setting.Method, setting.Addr, strings.NewReader(body)); err != nil{
+	if req, err = http.NewRequest(setting.Method, setting.Addr, strings.NewReader(body)); err != nil {
 		panic(err)
 	}
 
@@ -210,29 +209,36 @@ func ParseHttpParams(body url.Values) string {
 	return body.Encode()
 }
 
-func serviceRequest(fastHttp *FastHttp, callback HttpRes, done chan bool, queLen *int) {
+func serviceRequest(fastHttp *FastHttp, client *http.Client, done chan bool, queLen *int) {
 	var (
 		resp *http.Response
 		body []byte
 	)
 
 	defer func() {
+		if err := recover(); err != nil {
+			fmt.Println(err)
+		}
 		*queLen -= 1
-		if *queLen <= 0{
+		if *queLen <= 0 {
 			done <- true
 		}
 	}()
 
-	if resp, err = callback(fastHttp.Request); err != nil{
+	if resp, err = client.Do(fastHttp.Request); err != nil {
+
 		fastHttp.Setting.ErrorChannel <- err
 		return
 	}
 
-	defer func() {
-		resp.Body.Close()
-	}()
+	defer resp.Body.Close()
 
-	if body, err = ioutil.ReadAll(resp.Body); err != nil{
+	if resp.StatusCode == 404 {
+		fastHttp.Setting.ErrorChannel <- fmt.Errorf("http resp 404")
+		return
+	}
+
+	if body, err = ioutil.ReadAll(resp.Body); err != nil {
 		fastHttp.Setting.ErrorChannel <- err
 		return
 	}
@@ -242,62 +248,53 @@ func serviceRequest(fastHttp *FastHttp, callback HttpRes, done chan bool, queLen
 	fastHttp.Setting.DataChannel <- string(body)
 }
 
-
 type ClientSetting struct {
-	Timeout time.Duration
+	Timeout   time.Duration
 	Transport *http.Transport
-	Proxy func(*http.Request) (*url.URL, error)
+	Proxy     func(*http.Request) (*url.URL, error)
+	Client    *http.Client
 }
 
 func NewClient() *ClientSetting {
 	return &ClientSetting{
-		Timeout: time.Second,
-		Transport: &http.Transport{
-			TLSClientConfig: &tls.Config{
-				InsecureSkipVerify: true,
-			},
-			DisableCompression: false,
+		//Timeout: time.Second,
+		//Transport: &http.Transport{
+		//	TLSClientConfig: &tls.Config{
+		//		InsecureSkipVerify: true,
+		//	},
+		//	DisableCompression: false,
+		//},
+		Client: &http.Client{
+			Timeout: time.Second,
 		},
 	}
 }
 
 func (ctx *ClientSetting) SetTimeout(t time.Duration) *ClientSetting {
-	ctx.Timeout = t
-	return ctx
-}
-
-func (ctx *ClientSetting) SetProxy(u *url.URL) *ClientSetting{
-	ctx.Transport.Proxy = http.ProxyURL(u)
+	ctx.Client.Timeout = t
 	return ctx
 }
 
 func (ctx *ClientSetting) SetTransport(tr *http.Transport) *ClientSetting {
-	ctx.Transport = tr
+	ctx.Client.Transport = tr
 	return ctx
 }
 
 func (ctx *ClientSetting) Run() chan bool {
 	var (
-		done = make(chan bool, 1)
-		queueLen = len(requestQueue)
+		done        = make(chan bool, 1)
+		queueLen    = len(requestQueue)
 		lastRequest *FastHttp
-		ok bool
+		ok          bool
 	)
-
-	client := &http.Client{
-		Timeout: ctx.Timeout,
-		Transport: ctx.Transport,
-	}
 
 	for lastRequestVal, flag := fastSlice.Pop(&requestQueue); flag; {
 
-		if lastRequest, ok = lastRequestVal.Interface().(*FastHttp); !ok{
+		if lastRequest, ok = lastRequestVal.Interface().(*FastHttp); !ok {
 			continue
 		}
 
-		go serviceRequest(lastRequest, func(request *http.Request) (*http.Response, error) {
-			return client.Do(request)
-		}, done, &queueLen)
+		go serviceRequest(lastRequest, ctx.Client, done, &queueLen)
 
 		lastRequestVal, flag = fastSlice.Pop(&requestQueue)
 	}

@@ -1,20 +1,20 @@
 package fastCommon
 
 import (
-	"strings"
 	"archive/zip"
-	"io"
-	"os"
-	"golang.org/x/text/transform"
 	"bytes"
-	"golang.org/x/text/encoding/simplifiedchinese"
-	"io/ioutil"
-	"golib/fast-check"
-	"reflect"
-	"fmt"
-	"time"
-	"strconv"
 	"crypto/md5"
+	"fmt"
+	"golang.org/x/text/encoding/simplifiedchinese"
+	"golang.org/x/text/transform"
+	"golib/fast-check"
+	"io"
+	"io/ioutil"
+	"os"
+	"reflect"
+	"strconv"
+	"strings"
+	"time"
 )
 
 func JoinUrl(u1, u2 string) string {
@@ -183,33 +183,34 @@ func compress(dirName, deposit string, zWriter *zip.Writer, prefix string) error
 	return nil
 }
 
-func StrToZip(fileName, data, deposit string) error{
+func StrToZip(fileName, data, deposit string) error {
 	var (
-		err     	error
-		zipWriter 	*zip.Writer
-		w			io.Writer
-		r			io.Reader
+		err       error
+		zipWriter *zip.Writer
+		w         io.Writer
+		r         io.Reader
 	)
 
-	if zipWriter, err = getZipWrite(deposit); err != nil{
+	if zipWriter, err = getZipWrite(deposit); err != nil {
 		return err
 	}
 
-	if w, err = zipWriter.Create(fileName); err != nil{
+	if w, err = zipWriter.Create(fileName); err != nil {
 		return err
 	}
 
 	r = bytes.NewReader([]byte(data))
 
-	if _, err = io.Copy(w, r); err != nil{
+	if _, err = io.Copy(w, r); err != nil {
 		return err
 	}
 
 	defer zipWriter.Close()
+
 	return nil
 }
 
-func getZipWrite(deposit string) (*zip.Writer, error){
+func getZipWrite(deposit string) (*zip.Writer, error) {
 	var (
 		file    *os.File
 		err     error
@@ -231,11 +232,11 @@ func getZipWrite(deposit string) (*zip.Writer, error){
 
 func Zip(dirName, deposit string) error {
 	var (
-		err     error
+		err       error
 		zipWriter *zip.Writer
 	)
 
-	if zipWriter, err = getZipWrite(deposit); err != nil{
+	if zipWriter, err = getZipWrite(deposit); err != nil {
 		return err
 	}
 
@@ -303,12 +304,11 @@ func Date(mode string, t interface{}) string {
 
 }
 
-
-func Md5(str string , lower bool) string {
+func Md5(str string, lower bool) string {
 	md5Bytes := md5.Sum([]byte(str))
 	if lower {
 		return fmt.Sprintf("%x", md5Bytes)
-	}else{
+	} else {
 		return fmt.Sprintf("%X", md5Bytes)
 	}
 }
