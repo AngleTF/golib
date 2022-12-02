@@ -1,20 +1,17 @@
 package fastHttp
 
 import (
+	"encoding/base64"
 	"encoding/json"
 	"fmt"
-	"golib/fast-check"
-	"golib/fast-slice"
 	"io/ioutil"
 	"net/http"
 	"net/url"
 	"strings"
 	"time"
-	//"crypto/tls"
-	"encoding/base64"
 )
 
-//FastHttp method list
+// FastHttp method list
 const (
 	GET  = 1
 	POST = 2
@@ -24,29 +21,24 @@ const (
 type HttpError string
 
 func (ctx HttpError) Error() string {
-	return fmt.Sprintf("Http Error: %s", string(ctx))
+	return fmt.Sprintf("Fasthttp Error: %s", string(ctx))
 }
 
 type HttpHeader map[string]string
 type HttpRes func(*http.Request) (*http.Response, error)
 
-var (
-	requestQueue []*FastHttp //FastHttp queue
-	err          error
-)
-
 type Setting struct {
-	Addr         string      //http url
-	Method       string      //http method
-	MethodType   int8        //defined method
-	Params       interface{} //user source body params, map struct
-	Redirect     bool        //
-	UserAgent    string      //user agent
-	Cookie       string
-	Header       HttpHeader  //user source header params, map struct
-	Url          *url.URL    //Url obj
-	DataChannel  chan string //response data channel
-	ErrorChannel chan error  //error data channel
+	Addr       string      //http url
+	Method     string      //http method
+	MethodType int8        //defined method
+	Params     interface{} //user source body params, map _struct
+	Redirect   bool        //
+	UserAgent  string      //user agent
+	Cookie     string
+	Header     HttpHeader //user source header params, map _struct
+	Url        *url.URL   //Url obj
+	Timeout    time.Duration
+	Transport  http.RoundTripper
 }
 
 type FastHttp struct {
@@ -54,250 +46,200 @@ type FastHttp struct {
 	Request  *http.Request
 	Response *http.Response
 	Setting  *Setting
+	Error    error
 }
 
-func Get(addr string, dc chan string, ec chan error) *Setting {
-	return NewSetting("GET", addr, GET, HttpHeader{"Content-Type": "text/plain"}, dc, ec)
+func Get(addr string) *FastHttp {
+	return NewFastHttp("GET", addr, GET, HttpHeader{"Content-Type": "text/plain"})
 }
 
-func Post(addr string, dc chan string, ec chan error) *Setting {
-	return NewSetting("POST", addr, POST, HttpHeader{"Content-Type": "application/x-www-form-urlencoded"}, dc, ec)
+func Post(addr string) *FastHttp {
+	return NewFastHttp("POST", addr, POST, HttpHeader{"Content-Type": "application/x-www-form-urlencoded"})
 }
 
-func Json(addr string, dc chan string, ec chan error) *Setting {
-	return NewSetting("POST", addr, JSON, HttpHeader{"Content-Type": "application/json"}, dc, ec)
+func Json(addr string) *FastHttp {
+	return NewFastHttp("POST", addr, JSON, HttpHeader{"Content-Type": "application/json"})
 }
 
-func NewSetting(method string, addr string, methodType int8, headers HttpHeader, dc chan string, ec chan error) *Setting {
-	return &Setting{
-		Addr:         addr,
-		Method:       method,
-		MethodType:   methodType,
-		Redirect:     true,
-		UserAgent:    "FastHttp/v1.1",
-		Header:       headers,
-		DataChannel:  dc,
-		ErrorChannel: ec,
+func NewFastHttp(method string, addr string, methodType int8, headers HttpHeader) *FastHttp {
+	return &FastHttp{
+		Setting: &Setting{
+			Addr:       addr,
+			Method:     method,
+			MethodType: methodType,
+			Redirect:   true,
+			UserAgent:  "FastHttp/v1.2",
+			Header:     headers,
+		},
 	}
 }
 
-//format into k/v
-//is get method, join request url ? name = tao & age = 22
-func (ctx *Setting) SetParams(params interface{}) *Setting {
-
-	if gps, ok := params.(url.Values); ok {
-		ctx.Url, err = url.Parse(ctx.Addr)
-		if err != nil {
-			ctx.ErrorChannel <- err
-			return ctx
-		}
-
-		if ctx.MethodType == GET {
-			ctx.Url.RawQuery = gps.Encode()
-			ctx.Addr = ctx.Url.String()
-		}
-	}
-
-	//fmt.Println(ctx.Addr)
-
-	ctx.Params = params
+// format into k/v
+// is get method, join request url ? name = tao & age = 22
+func (ctx *FastHttp) SetParams(params interface{}) *FastHttp {
+	ctx.Setting.Params = params
 	return ctx
 }
 
-func (ctx *Setting) SetUserAgent(userAgent string) *Setting {
-	ctx.UserAgent = userAgent
+func (ctx *FastHttp) SetTimeout(timeout time.Duration) *FastHttp {
+	ctx.Setting.Timeout = timeout
 	return ctx
 }
 
-func (ctx *Setting) SetHeader(headers HttpHeader) *Setting {
+func (ctx *FastHttp) SetTransport(tr *http.Transport) *FastHttp {
+	ctx.Setting.Transport = tr
+	return ctx
+}
+
+func (ctx *FastHttp) SetUserAgent(userAgent string) *FastHttp {
+	ctx.Setting.UserAgent = userAgent
+	return ctx
+}
+
+func (ctx *FastHttp) SetHeader(headers HttpHeader) *FastHttp {
 	for k, v := range headers {
-		ctx.Header[k] = v
+		ctx.Setting.Header[k] = v
 	}
 	return ctx
 }
 
-func (ctx *Setting) SetCookie(name string, value string, path string, tm time.Time) *Setting {
+func (ctx *FastHttp) SetCookie(name string, value string, path string, tm time.Time) *FastHttp {
 	var cookie = http.Cookie{
 		Name:    name,
 		Value:   value,
 		Path:    path,
 		Expires: tm,
 	}
-	if !fastCheck.IsEmpty(ctx.Cookie) {
-		ctx.Cookie += "; "
+
+	if ctx.Setting.Cookie != "" {
+		ctx.Setting.Cookie += "; "
 	}
-	ctx.Cookie += cookie.String()
+
+	ctx.Setting.Cookie += cookie.String()
 	return ctx
 }
 
-func (ctx *Setting) SetSourceCookie(c []*http.Cookie) *Setting {
-	if c == nil {
-		return ctx
-	}
+func (ctx *FastHttp) SetSourceCookie(c []*http.Cookie) *FastHttp {
 	for _, v := range c {
-		if !fastCheck.IsEmpty(ctx.Cookie) {
-			ctx.Cookie += "; "
-		}
-		ctx.Cookie += v.String()
+		ctx.SetCookie(v.Name, v.Value, v.Path, v.Expires)
 	}
 	return ctx
 }
 
-func (ctx *Setting) SetProxyAuthorization(username, password string) *Setting {
-	ctx.Header["Proxy-Authorization"] = "Basic " + base64.StdEncoding.EncodeToString([]byte(username+":"+password))
+// Only HTTP types can be used
+func (ctx *FastHttp) SetBasicProxyAuthorization(username, password string) *FastHttp {
+	basic := "Basic " + base64.StdEncoding.EncodeToString([]byte(username+":"+password))
+	ctx.Setting.Header["Proxy-Authorization"] = basic
 	return ctx
 }
 
-func (ctx *Setting) PushQueue() {
-	//Dependency injection
-	NewFastHttp(ctx).PushQueue()
+func (ctx *FastHttp) SetAuthorization(username, password string) *FastHttp {
+	basic := base64.StdEncoding.EncodeToString([]byte(username + ":" + password))
+	ctx.Setting.Header["Authorization"] = basic
+	return ctx
 }
 
-func NewFastHttp(setting *Setting) *FastHttp {
+func (ctx *FastHttp) Build() (*FastClient, error) {
+
 	var (
 		req  *http.Request
 		body string
+		conf = ctx.Setting
+		gps  url.Values
+		ok   bool
+		err  error
 	)
 
-	if setting.Params != nil {
-		switch setting.MethodType {
+	if conf.Params != nil {
+		switch conf.MethodType {
 		case GET:
+
+			if gps, ok = conf.Params.(url.Values); !ok {
+				return nil, fmt.Errorf("request parameter conversion failed")
+			}
+
+			if conf.Url, err = url.Parse(conf.Addr); err != nil {
+				return nil, fmt.Errorf("request address conversion failed")
+			}
+
+			if conf.Url.RawQuery != "" {
+				conf.Url.RawQuery += "&"
+			}
+
+			conf.Url.RawQuery += gps.Encode()
+			conf.Addr = conf.Url.String()
 		case POST:
-			if gps, ok := setting.Params.(url.Values); ok {
-				body = ParseHttpParams(gps)
-			} else {
-				panic(err.Error())
+			switch conf.Params.(type) {
+			case string:
+				body = conf.Params.(string)
+				break
+			case url.Values:
+				body = conf.Params.(url.Values).Encode()
 			}
 		case JSON:
-			var params []byte
-			params, err = json.Marshal(setting.Params)
-			if err != nil {
-				panic(err)
+			var jsonParams []byte
+			if jsonParams, err = json.Marshal(conf.Params); err != nil {
+				return nil, fmt.Errorf("request parameter conversion failed")
 			}
-			body = string(params)
+			body = string(jsonParams)
 		}
 	}
 
-	if req, err = http.NewRequest(setting.Method, setting.Addr, strings.NewReader(body)); err != nil {
-		panic(err)
+	if req, err = http.NewRequest(conf.Method, conf.Addr, strings.NewReader(body)); err != nil {
+		return nil, err
 	}
 
-	if !fastCheck.IsEmpty(setting.UserAgent) {
-		req.Header.Set("User-Agent", setting.UserAgent)
-	}
-
-	if !fastCheck.IsEmpty(setting.Cookie) {
-		req.Header.Set("Cookie", setting.Cookie)
-	}
-
-	for k, v := range setting.Header {
+	for k, v := range conf.Header {
 		req.Header.Set(k, v)
 	}
 
-	return &FastHttp{
-		Request: req,
-		Body:    body,
-		Setting: setting,
+	if conf.UserAgent != "" {
+		req.Header.Set("User-Agent", conf.UserAgent)
 	}
+
+	if conf.Cookie != "" {
+		req.Header.Set("Cookie", conf.Cookie)
+	}
+
+	ctx.Request = req
+	ctx.Body = body
+
+	return &FastClient{
+		http: ctx,
+	}, nil
 }
 
-func (ctx *FastHttp) PushQueue() {
-	requestQueue = append(requestQueue, ctx)
+type FastClient struct {
+	http *FastHttp
 }
 
-func ParseHttpParams(body url.Values) string {
-	return body.Encode()
-}
-
-func serviceRequest(fastHttp *FastHttp, client *http.Client, done chan bool, queLen *int) {
+func (f *FastClient) Fetch() ([]byte, *http.Response, error) {
 	var (
-		resp *http.Response
-		body []byte
+		conf   = f.http.Setting
+		client *http.Client
+		rsp    *http.Response
+		err    error
+		data   []byte
 	)
 
-	defer func() {
-		if err := recover(); err != nil {
-			fmt.Println(err)
-		}
-		*queLen -= 1
-		if *queLen <= 0 {
-			done <- true
-		}
-	}()
-
-	if resp, err = client.Do(fastHttp.Request); err != nil {
-
-		fastHttp.Setting.ErrorChannel <- err
-		return
+	client = &http.Client{
+		Timeout:   conf.Timeout,
+		Transport: conf.Transport,
 	}
 
-	defer resp.Body.Close()
-
-	if resp.StatusCode == 404 {
-		fastHttp.Setting.ErrorChannel <- fmt.Errorf("http resp 404")
-		return
+	if rsp, err = client.Do(f.http.Request); err != nil {
+		return nil, nil, err
 	}
 
-	if body, err = ioutil.ReadAll(resp.Body); err != nil {
-		fastHttp.Setting.ErrorChannel <- err
-		return
+	defer rsp.Body.Close()
+
+	if rsp.StatusCode == http.StatusNotFound {
+		return nil, nil, fmt.Errorf("http 404")
 	}
 
-	fastHttp.Response = resp
-
-	fastHttp.Setting.DataChannel <- string(body)
-}
-
-type ClientSetting struct {
-	Timeout   time.Duration
-	Transport *http.Transport
-	Proxy     func(*http.Request) (*url.URL, error)
-	Client    *http.Client
-}
-
-func NewClient() *ClientSetting {
-	return &ClientSetting{
-		//Timeout: time.Second,
-		//Transport: &http.Transport{
-		//	TLSClientConfig: &tls.Config{
-		//		InsecureSkipVerify: true,
-		//	},
-		//	DisableCompression: false,
-		//},
-		Client: &http.Client{
-			Timeout: time.Second,
-		},
-	}
-}
-
-func (ctx *ClientSetting) SetTimeout(t time.Duration) *ClientSetting {
-	ctx.Client.Timeout = t
-	return ctx
-}
-
-func (ctx *ClientSetting) SetTransport(tr *http.Transport) *ClientSetting {
-	ctx.Client.Transport = tr
-	return ctx
-}
-
-func (ctx *ClientSetting) Run() chan bool {
-	var (
-		done        = make(chan bool, 1)
-		queueLen    = len(requestQueue)
-		lastRequest *FastHttp
-		ok          bool
-	)
-
-	for lastRequestVal, flag := fastSlice.Pop(&requestQueue); flag; {
-
-		if lastRequest, ok = lastRequestVal.Interface().(*FastHttp); !ok {
-			continue
-		}
-
-		go serviceRequest(lastRequest, ctx.Client, done, &queueLen)
-
-		lastRequestVal, flag = fastSlice.Pop(&requestQueue)
+	if data, err = ioutil.ReadAll(rsp.Body); err != nil {
+		return nil, nil, err
 	}
 
-	return done
+	return data, rsp, nil
 }
