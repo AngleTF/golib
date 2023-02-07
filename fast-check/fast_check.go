@@ -1,8 +1,8 @@
 package fastCheck
 
 import (
-	"reflect"
 	"fmt"
+	"reflect"
 )
 
 func IsZero(v interface{}) bool {
@@ -13,7 +13,7 @@ func IsEmpty(v string) bool {
 	return v == ""
 }
 
-func IsNil(v interface{}) bool{
+func IsNil(v interface{}) bool {
 	return v == nil
 }
 
@@ -27,17 +27,35 @@ func SliceLenEqual(args ...interface{}) bool {
 	var vof reflect.Value
 	var flag bool = true
 	var length int
-	for k, v := range args{
+	for k, v := range args {
 		vof = reflect.ValueOf(v)
 		if vof.Kind() != reflect.Slice {
 			flag = false
 		}
-		if IsZero(k){
+		if IsZero(k) {
 			length = vof.Len()
 		}
-		if length != vof.Len(){
+		if length != vof.Len() {
 			flag = false
 		}
 	}
 	return flag
+}
+
+func InSlice(arr interface{}, in interface{}) bool {
+
+	var (
+		rv reflect.Value
+	)
+
+	rv = reflect.ValueOf(arr)
+	if rv.Kind() == reflect.Slice || rv.Kind() == reflect.Array {
+		for i := 0; i < rv.Len(); i++ {
+			if rv.Index(i).Interface() == in {
+				return true
+			}
+		}
+	}
+
+	return false
 }
