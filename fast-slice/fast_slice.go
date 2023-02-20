@@ -2,7 +2,6 @@ package fastSlice
 
 import (
 	"reflect"
-
 )
 
 func Pop(v interface{}) (reflect.Value, bool) {

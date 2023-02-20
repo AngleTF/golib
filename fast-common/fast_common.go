@@ -7,7 +7,7 @@ import (
 	"fmt"
 	"golang.org/x/text/encoding/simplifiedchinese"
 	"golang.org/x/text/transform"
-	"golib/fast-check"
+	"github.com/AngleTF/golib/fast-check"
 	"io"
 	"io/ioutil"
 	"os"

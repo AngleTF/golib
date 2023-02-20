@@ -3,7 +3,7 @@ package fastFile
 import (
 	"os"
 	"fmt"
-	"golib/fast-common"
+	"github.com/AngleTF/golib/fast-common"
 )
 
 type Setting struct {

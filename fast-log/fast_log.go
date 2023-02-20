@@ -1,10 +1,10 @@
 package fastLog
 
 import (
-	"golib/fast-file"
+	"github.com/AngleTF/golib/fast-file"
 	"os"
 	"fmt"
-	"golib/fast-common"
+	"github.com/AngleTF/golib/fast-common"
 	"time"
 )
 
